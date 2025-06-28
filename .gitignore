@@ -38,3 +38,7 @@ Thumbs.db
 .coverage
 *.cover
 .pytest_cache/ 
+
+ragdemo_optimized.gif
+ragdemo.gif
+ragdemo.mp4
