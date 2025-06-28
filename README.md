@@ -2,6 +2,12 @@
 
 A Retrieval-Augmented Generation (RAG) Q&A system implemented using ChromaDB, LlamaIndex, and Streamlit with OpenAI GPT-4o. This project is a practice of RAG pipeline implementation.
 
+## Demo
+
+![RAG Q&A System Demo](ragdemo_optimized.gif)
+
+*RAG Q&A*
+
 ## What is RAG?
 
 **Retrieval-Augmented Generation (RAG)** is an AI technique that leverages:
