@@ -140,9 +140,29 @@ class ChromaVectorStore:
             return result
             
         except Exception as e:
-            error_msg = f"Error adding nodes to vector store: {str(e)}"
-            logger.error(error_msg)
-            return {'success': False, 'error': error_msg}
+            # Handle ChromaDB corruption issues
+            if "compaction" in str(e).lower() or "metadata segment" in str(e).lower():
+                logger.warning(f"ChromaDB corruption detected: {str(e)}")
+                logger.info("Attempting to recover by resetting collection...")
+                
+                try:
+                    # Reset the collection
+                    if self.reset_collection():
+                        # Retry adding nodes to the fresh collection
+                        logger.info("Retrying node addition after collection reset...")
+                        return self.add_nodes(nodes)
+                    else:
+                        error_msg = f"Failed to recover from ChromaDB corruption: {str(e)}"
+                        logger.error(error_msg)
+                        return {'success': False, 'error': error_msg}
+                except Exception as recovery_error:
+                    error_msg = f"Recovery failed: {str(recovery_error)}"
+                    logger.error(error_msg)
+                    return {'success': False, 'error': error_msg}
+            else:
+                error_msg = f"Error adding nodes to vector store: {str(e)}"
+                logger.error(error_msg)
+                return {'success': False, 'error': error_msg}
     
     def query(self, query_text: str, top_k: int = None, filters: Optional[Dict] = None) -> Dict[str, Any]:
         """

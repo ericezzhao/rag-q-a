@@ -56,12 +56,13 @@ class RAGPipeline:
         
         logger.info("RAG pipeline initialized successfully")
     
-    def ingest_document(self, file_path: str) -> Dict[str, Any]:
+    def ingest_document(self, file_path: str, original_filename: Optional[str] = None) -> Dict[str, Any]:
         """
         Ingest a document into the RAG system
         
         Args:
             file_path: Path to the document file
+            original_filename: Original filename to use in metadata (instead of temp file name)
             
         Returns:
             Dictionary with ingestion results
@@ -82,7 +83,7 @@ class RAGPipeline:
             
             # Step 2: Process document (load and chunk)
             logger.info("Processing document...")
-            processing_result = self.document_processor.process_uploaded_file(file_path)
+            processing_result = self.document_processor.process_uploaded_file(file_path, original_filename=original_filename)
             
             if not processing_result['success']:
                 return {
@@ -98,11 +99,28 @@ class RAGPipeline:
             vector_result = self.vector_store.add_nodes(chunks)
             
             if not vector_result['success']:
-                return {
-                    'success': False,
-                    'error': f"Vector store ingestion failed: {vector_result['error']}",
-                    'file_path': file_path
-                }
+                # Check if this is a ChromaDB corruption error
+                if "compaction" in vector_result['error'].lower() or "metadata segment" in vector_result['error'].lower():
+                    logger.warning("ChromaDB corruption detected during ingestion, attempting recovery...")
+                    
+                    # Try to recover by resetting the collection
+                    if self.vector_store.reset_collection():
+                        logger.info("Collection reset successful, retrying ingestion...")
+                        # Retry the entire ingestion process
+                        return self.ingest_document(file_path)
+                    else:
+                        return {
+                            'success': False,
+                            'error': f"ChromaDB corruption recovery failed: {vector_result['error']}",
+                            'file_path': file_path,
+                            'recovery_attempted': True
+                        }
+                else:
+                    return {
+                        'success': False,
+                        'error': f"Vector store ingestion failed: {vector_result['error']}",
+                        'file_path': file_path
+                    }
             
             # Step 4: Compile results
             ingestion_time = time.time() - start_time

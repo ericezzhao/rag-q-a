@@ -46,12 +46,13 @@ class DocumentProcessor:
         
         logger.info(f"DocumentProcessor initialized with chunk_size={self.chunk_size}, chunk_overlap={self.chunk_overlap}")
     
-    def load_document(self, file_path: str) -> List[Document]:
+    def load_document(self, file_path: str, original_filename: Optional[str] = None) -> List[Document]:
         """
         Load a single document from file path
         
         Args:
             file_path: Path to the document file
+            original_filename: Original filename to use in metadata (instead of temp file name)
             
         Returns:
             List of Document objects
@@ -82,8 +83,11 @@ class DocumentProcessor:
                 raise ValueError(f"Unsupported file type: {file_extension}")
             
             for doc in documents:
+                # Use original filename if provided, otherwise use the actual file path name
+                display_name = original_filename if original_filename else file_path.name
+                
                 doc.metadata.update({
-                    'file_name': file_path.name,
+                    'file_name': display_name,
                     'file_path': str(file_path),
                     'file_size': file_path.stat().st_size,
                     'file_type': file_extension,
@@ -170,18 +174,19 @@ class DocumentProcessor:
         logger.info(f"Total chunks created: {len(all_nodes)}")
         return all_nodes
     
-    def process_uploaded_file(self, file_path: str) -> Dict[str, Any]:
+    def process_uploaded_file(self, file_path: str, original_filename: Optional[str] = None) -> Dict[str, Any]:
         """
         Process an uploaded file end-to-end: load and chunk
         
         Args:
             file_path: Path to the uploaded file
+            original_filename: Original filename to use in metadata (instead of temp file name)
             
         Returns:
             Dictionary with processing results
         """
         try:
-            documents = self.load_document(file_path)
+            documents = self.load_document(file_path, original_filename=original_filename)
             
             chunks = self.chunk_documents(documents)
             

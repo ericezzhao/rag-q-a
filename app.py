@@ -26,7 +26,7 @@ def initialize_rag_pipeline():
         
         pipeline = RAGPipeline(
             vector_store_path=str(data_dir / "vector_store"),
-            collection_name="streamlit_rag_collection"
+            collection_name="streamlit_rag_collection_fresh"
         )
         return pipeline, None
     except Exception as e:
@@ -148,8 +148,8 @@ def process_file(pipeline, uploaded_file):
         with st.spinner(f"Processing {uploaded_file.name}..."):
             start_time = time.time()
             
-            # Process with RAG pipeline
-            result = pipeline.ingest_document(tmp_file_path)
+            # Process with RAG pipeline, passing original file name
+            result = pipeline.ingest_document(tmp_file_path, original_filename=uploaded_file.name)
             
             processing_time = time.time() - start_time
         
