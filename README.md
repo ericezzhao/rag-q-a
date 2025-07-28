@@ -26,7 +26,7 @@ A Retrieval-Augmented Generation (RAG) Q&A system implemented using ChromaDB, Ll
 ### 1. Environment Setup
 ```bash
 # Clone repo
-git clone <repository-url>
+git clone https://github.com/ericezzhao/rag-q-a.git
 cd rag-q-a
 
 # Create virtual environment
