@@ -5,7 +5,7 @@ Built using LlamaIndex lower-level abstractions
 """
 
 import logging
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from pathlib import Path
 import time
 

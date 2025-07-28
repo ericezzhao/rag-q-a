@@ -5,7 +5,6 @@ Main entry point for the RAG Q&A system using ChromaDB, LlamaIndex, and Streamli
 
 import streamlit as st
 import tempfile
-import os
 from pathlib import Path
 import time
 

@@ -1,19 +1,14 @@
+# Core RAG dependencies
 llama-index
 chromadb
 streamlit
-
 openai
 
-pypdf2
-python-docx
-python-pptx
-
+# Environment and configuration
 python-dotenv
-pandas
-numpy
 
+# Testing
 pytest
-pytest-asyncio
 
-requests
-pathlib2
+# Optional: For vector analysis in tests
+numpy

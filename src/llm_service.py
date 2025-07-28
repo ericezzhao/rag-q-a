@@ -5,12 +5,10 @@ Model: GPT-4o
 """
 
 import logging
-from typing import List, Dict, Any, Optional, Union
-import json
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
 from llama_index.llms.openai import OpenAI
-from llama_index.core.base.llms.types import ChatMessage, MessageRole
 
 try:
     from .config import Config

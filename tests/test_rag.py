@@ -3,7 +3,6 @@ Complete RAG Pipeline Test
 Ask specific questions about the content
 """
 
-import os
 import sys
 import tempfile
 from pathlib import Path

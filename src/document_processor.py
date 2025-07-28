@@ -3,7 +3,6 @@ Document Processing Module for RAG Q&A System
 Using LlamaIndex lower-level abstractions for document loading and chunking
 """
 
-import os
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 import logging
@@ -11,7 +10,7 @@ import logging
 from llama_index.core import Document
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.readers.file import PDFReader, DocxReader
-from llama_index.core.schema import BaseNode, TextNode
+from llama_index.core.schema import TextNode
 
 try:
     from .config import Config

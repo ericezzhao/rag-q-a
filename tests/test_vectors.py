@@ -3,7 +3,6 @@ Enhanced Vector Store Test with Documents
 Shows actual embeddings and vector operations
 """
 
-import os
 import sys
 import tempfile
 import numpy as np
@@ -36,7 +35,7 @@ def test_vector_processing():
     print(f"   💾 Persist path: {temp_dir}")
     print()
     
-    test_folder = Path("test_documents")
+    test_folder = Path(__file__).parent / "test_documents"
     if not test_folder.exists():
         print("❌ test_documents folder not found!")
         print("   Run: python test_document.py first")

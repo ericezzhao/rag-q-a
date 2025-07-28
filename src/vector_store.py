@@ -3,15 +3,15 @@ ChromaDB Vector Store Module for RAG Q&A System
 Implements vector storage and retrieval using ChromaDB's native capabilities
 """
 
-import os
 import uuid
 import logging
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from pathlib import Path
 
 import chromadb
 from chromadb.config import Settings
-from llama_index.core.schema import TextNode, BaseNode
+from chromadb.errors import NotFoundError
+from llama_index.core.schema import TextNode
 from llama_index.embeddings.openai import OpenAIEmbedding
 
 try:
@@ -70,7 +70,7 @@ class ChromaVectorStore:
             # Try to get existing collection
             collection = self.client.get_collection(name=self.collection_name)
             logger.info(f"Retrieved existing collection '{self.collection_name}' with {collection.count()} documents")
-        except ValueError:
+        except NotFoundError:
             # Collection doesn't exist, create it
             collection = self.client.create_collection(
                 name=self.collection_name,

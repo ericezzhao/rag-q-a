@@ -4,7 +4,6 @@ Place your file in the test_documents/ folder and run this script
 Default document includes Eric Zhao's resume
 """
 
-import os
 import sys
 from pathlib import Path
 
@@ -24,7 +23,7 @@ def test_document_processing():
     print(f"   🔄 Chunk overlap: {processor.chunk_overlap}")
     print()
     
-    test_folder = Path("./test_documents")
+    test_folder = Path(__file__).parent / "test_documents"
     if not test_folder.exists():
         print("❌ test_documents folder not found!")
         print("   Create it with: mkdir test_documents")
