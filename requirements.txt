@@ -1,14 +1,10 @@
-# Core RAG dependencies
 llama-index
 chromadb
 streamlit
 openai
 
-# Environment and configuration
 python-dotenv
 
-# Testing
 pytest
 
-# Optional: For vector analysis in tests
 numpy
