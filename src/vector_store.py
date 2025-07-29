@@ -205,9 +205,7 @@ class ChromaVectorStore:
             for i in range(len(results['documents'][0])):
                 node_data = {
                     'text': results['documents'][0][i],
-                    'metadata': results['metadatas'][0][i],
-                    'score': 1.0 - results['distances'][0][i],  # Convert distance to similarity score
-                    'distance': results['distances'][0][i]
+                    'metadata': results['metadatas'][0][i]
                 }
                 retrieved_nodes.append(node_data)
             

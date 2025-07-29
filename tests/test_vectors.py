@@ -127,13 +127,9 @@ def test_vector_processing():
         print(f"✅ Found {len(nodes)} results")
         
         for i, node in enumerate(nodes, 1):
-            similarity_score = node['score']
-            distance = node['distance']
             text_preview = node['text'][:100]
             
             print(f"   Result {i}:")
-            print(f"     🎯 Similarity: {similarity_score:.4f}")
-            print(f"     📏 Distance: {distance:.4f}")
             print(f"     📝 Text: {text_preview}...")
             
             # Show metadata

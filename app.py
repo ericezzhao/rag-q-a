@@ -420,9 +420,8 @@ def display_sources_enhanced(sources):
         metadata = chunk['metadata']
         file_name = metadata.get('file_name', f'Source {i}')
         section = metadata.get('section', 'unknown section')
-        similarity = chunk['similarity_score']
         
-        with st.expander(f"📄 {file_name} ({section}) - Relevance: {similarity:.1%}", expanded=False):
+        with st.expander(f"📄 {file_name} ({section})", expanded=False):
             # Content with better formatting
             st.markdown("**📝 Content:**")
             st.markdown(f"```\n{chunk['text']}\n```")
@@ -442,7 +441,7 @@ def display_stats_enhanced(stats, query_params):
     st.markdown("**📊 Query Performance:**")
     
     # Performance metrics
-    perf_col1, perf_col2, perf_col3, perf_col4 = st.columns(4)
+    perf_col1, perf_col2, perf_col3 = st.columns(3)
     
     with perf_col1:
         st.metric("🧩 Chunks Retrieved", stats['chunks_retrieved'])
@@ -450,9 +449,6 @@ def display_stats_enhanced(stats, query_params):
         st.metric("📝 Context Length", f"{stats['total_context_chars']:,} chars")
     with perf_col3:
         st.metric("⏱️ Query Time", f"{stats['query_time_seconds']:.2f}s")
-    with perf_col4:
-        avg_similarity = sum(chunk['similarity_score'] for chunk in stats.get('retrieved_chunks', [])) / max(len(stats.get('retrieved_chunks', [])), 1)
-        st.metric("🎯 Avg Relevance", f"{avg_similarity:.1%}")
     
     # Query parameters used
     st.markdown("**⚙️ Query Parameters:**")
@@ -587,7 +583,7 @@ def main():
         initial_sidebar_state="expanded"
     )
     
-    st.title("🤖 RAG Q&A System")
+    st.title("RAG Q&A System")
     st.markdown("Built with ChromaDB, LlamaIndex, and OpenAI GPT-4o")
     st.markdown("---")
     

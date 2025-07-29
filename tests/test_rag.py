@@ -128,11 +128,10 @@ def test_rag_pipeline():
                 print("   ⚠️  NO CHUNKS RETRIEVED! This may be why the model says 'not enough information'")
             else:
                 for j, chunk in enumerate(result['retrieved_chunks'], 1):
-                    score = chunk['similarity_score']
                     source = chunk['metadata'].get('file_name', 'Unknown')
                     section = chunk['metadata'].get('section', 'Unknown')
                     preview = chunk['text'][:100]
-                    print(f"   {j}. {source} | Section: {section} | Score: {score:.3f}")
+                    print(f"   {j}. {source} | Section: {section}")
                     print(f"      📝 Text: {preview}...")
             
             stats = result['pipeline_stats']
@@ -178,12 +177,9 @@ def test_rag_pipeline():
                     print("   💡 Try rephrasing your question or check if the document was properly ingested")
                 else:
                     for i, chunk in enumerate(result['retrieved_chunks'], 1):
-                        score = chunk['similarity_score']
                         source = chunk['metadata'].get('file_name', 'Unknown')
-                        print(f"   {i}. {source} | Score: {score:.3f}")
+                        print(f"   {i}. {source}")
                         print(f"      📝 {chunk['text'][:150]}...")
-                        if score < 0.6:
-                            print(f"      ⚠️  Low relevance score ({score:.3f})")
                 
                 print(f"\n⏱️  Response time: {result['pipeline_stats']['query_time_seconds']}s")
                 
@@ -194,7 +190,6 @@ def test_rag_pipeline():
                 ]):
                     print("⚠️  🤖 Model indicated insufficient information!")
                     print("💡 This might be due to:")
-                    print("   - Low similarity scores in retrieved chunks")
                     print("   - Question not matching document content")
                     print("   - Document chunking issues")
                     

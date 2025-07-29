@@ -237,8 +237,7 @@ class RAGPipeline:
                 'response': llm_result['response'],
                 'retrieved_chunks': [{
                     'text': chunk['text'],
-                    'metadata': chunk['metadata'],
-                    'similarity_score': chunk['score']
+                    'metadata': chunk['metadata']
                 } for chunk in retrieved_chunks],
                 'sources': self._extract_sources(retrieved_chunks),
                 'pipeline_stats': {
