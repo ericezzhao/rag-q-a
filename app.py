@@ -74,8 +74,6 @@ def display_system_status(pipeline):
         pipeline_status = status['pipeline']['status']
         if pipeline_status == 'operational':
             st.sidebar.success(f"🔄 Pipeline: {pipeline_status}")
-            ready_for_queries = status['pipeline']['ready_for_queries']
-            st.sidebar.write(f"❓ Ready for queries: {'✅' if ready_for_queries else '❌'}")
         else:
             st.sidebar.error(f"🔄 Pipeline: {pipeline_status}")
             
@@ -325,10 +323,10 @@ def display_enhanced_response(entry, entry_number, is_history=False):
         # Answer with enhanced formatting
         st.markdown("**🤖 Answer:**")
         
-        # Create a bordered container for the answer
+        # Create a bordered container for the answer with enhanced formatting
         answer_container = st.container()
         with answer_container:
-            # Custom CSS for better answer display with math support
+            # Display response with custom CSS styling for better presentation
             st.markdown(f"""
             <div style="
                 background-color: #f8f9fa;
@@ -342,9 +340,6 @@ def display_enhanced_response(entry, entry_number, is_history=False):
                 {entry['response']}
             </div>
             """, unsafe_allow_html=True)
-            
-            # Also display as markdown for better formatting
-            st.markdown(entry['response'])
         
         # Action buttons for this response
         action_col1, action_col2, action_col3, action_col4 = st.columns(4)
