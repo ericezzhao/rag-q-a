@@ -66,7 +66,6 @@ def display_system_status(pipeline):
         llm_status = status['llm_service']['status']
         if llm_status == 'healthy':
             st.sidebar.success(f"🤖 LLM: {llm_status}")
-            st.sidebar.write(f"🧠 Model: {status['llm_service']['model']}")
         else:
             st.sidebar.error(f"🤖 LLM: {llm_status}")
         
