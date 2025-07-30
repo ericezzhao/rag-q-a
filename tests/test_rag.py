@@ -129,9 +129,8 @@ def test_rag_pipeline():
             else:
                 for j, chunk in enumerate(result['retrieved_chunks'], 1):
                     source = chunk['metadata'].get('file_name', 'Unknown')
-                    section = chunk['metadata'].get('section', 'Unknown')
                     preview = chunk['text'][:100]
-                    print(f"   {j}. {source} | Section: {section}")
+                    print(f"   {j}. {source}")
                     print(f"      📝 Text: {preview}...")
             
             stats = result['pipeline_stats']

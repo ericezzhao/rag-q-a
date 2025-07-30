@@ -94,9 +94,9 @@ def document_upload_interface(pipeline):
         # File upload
         uploaded_files = st.file_uploader(
             "Upload documents for Q&A",
-            type=['pdf', 'txt', 'docx'],
+            type=['pdf', 'txt', 'docx', 'csv', 'xlsx', 'xls'],
             accept_multiple_files=True,
-            help="Upload PDF, TXT, or DOCX files to add to your knowledge base"
+            help="Upload PDF, TXT, DOCX, CSV, or Excel files to add to your knowledge base"
         )
         
         if uploaded_files:
@@ -208,24 +208,20 @@ def qa_interface(pipeline):
     # Initialize session state for conversation history
     if 'conversation_history' not in st.session_state:
         st.session_state.conversation_history = []
-    if 'show_advanced_options' not in st.session_state:
-        st.session_state.show_advanced_options = False
     
     # Check if documents are available
     try:
         doc_list = pipeline.list_documents()
         
-        if not doc_list['success'] or doc_list['total_sources'] == 0:
-            st.warning("📄 No documents in knowledge base. Upload documents first!")
-            return
-        
-        file_count = doc_list['total_sources']
-        chunk_count = doc_list['total_documents']
-        st.info(f"📚 Knowledge base contains {file_count} files ({chunk_count} chunks). Ask me anything!")
+        if doc_list['success'] and doc_list['total_sources'] > 0:
+            file_count = doc_list['total_sources']
+            chunk_count = doc_list['total_documents']
+            st.info(f"📚 Knowledge base contains {file_count} files ({chunk_count} chunks). Ask me anything!")
+        else:
+            st.info("💬 No documents uploaded yet. You can still ask general questions or get help with tasks!")
         
     except Exception as e:
-        st.error(f"❌ Unable to check document status: {str(e)}")
-        return
+        st.warning(f"⚠️ Unable to check document status: {str(e)}. You can still ask questions!")
     
 
     
@@ -244,26 +240,11 @@ def qa_interface(pipeline):
     question = st.text_area(
         "Enter your question:",
         value=st.session_state.question_text,
-        placeholder="e.g., What is this document about?",
-        help="Ask any question about the uploaded documents. You can ask multiple questions at once.",
+        placeholder="e.g., What is this document about? Or ask for help with tasks like drafting emails, explaining concepts, etc.",
+        help="Ask any question about uploaded documents or get help with general tasks. You can ask multiple questions at once.",
         height=100,
         key="question_input"
     )
-    
-    # Advanced query settings - always visible
-    with st.expander("⚙️ Advanced Query Settings", expanded=True):
-        adv_col1, adv_col2, adv_col3 = st.columns(3)
-        
-        with adv_col1:
-            top_k = st.slider("📊 Chunks to retrieve", 1, 10, 5, help="More chunks = more context but slower")
-            
-        with adv_col2:
-            temperature = st.slider("🌡️ Response creativity", 0.0, 1.0, 0.1, 0.1, 
-                                  help="Higher = more creative, Lower = more focused")
-            
-        with adv_col3:
-            max_tokens = st.slider("📝 Max response length", 100, 2000, 1000, 50,
-                                 help="Maximum tokens in the response")
     
     # Query action buttons
     col1, col2, col3 = st.columns([2, 1, 1])
@@ -282,15 +263,9 @@ def qa_interface(pipeline):
     if ask_button and question.strip():
         st.session_state.question_text = ''
         
-        with st.spinner("🔍 Searching knowledge base and generating response..."):
-            # Store query parameters for potential pipeline enhancement
-            query_params = {
-                'top_k': top_k,
-                'temperature': temperature,
-                'max_tokens': max_tokens
-            }
-            
-            result = pipeline.query(question, top_k=top_k)
+        with st.spinner("Generating response..."):
+            # Use unlimited chunks and max response length
+            result = pipeline.query(question, top_k=10)  # Increased to 10 for more context
         
         if result['success']:
             # Add to conversation history
@@ -299,8 +274,7 @@ def qa_interface(pipeline):
                 'question': question,
                 'response': result['response'],
                 'sources': result['retrieved_chunks'],
-                'stats': result['pipeline_stats'],
-                'query_params': query_params
+                'stats': result['pipeline_stats']
             }
             st.session_state.conversation_history.append(conversation_entry)
             
@@ -354,7 +328,7 @@ def display_enhanced_response(entry, entry_number, is_history=False):
         # Create a bordered container for the answer
         answer_container = st.container()
         with answer_container:
-            # Custom CSS for better answer display
+            # Custom CSS for better answer display with math support
             st.markdown(f"""
             <div style="
                 background-color: #f8f9fa;
@@ -362,10 +336,15 @@ def display_enhanced_response(entry, entry_number, is_history=False):
                 border-radius: 10px;
                 border-left: 4px solid #007bff;
                 margin: 10px 0;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                line-height: 1.6;
             ">
                 {entry['response']}
             </div>
             """, unsafe_allow_html=True)
+            
+            # Also display as markdown for better formatting
+            st.markdown(entry['response'])
         
         # Action buttons for this response
         action_col1, action_col2, action_col3, action_col4 = st.columns(4)
@@ -404,7 +383,7 @@ def display_enhanced_response(entry, entry_number, is_history=False):
         # Show stats if toggled
         stats_toggle_key = f"stats_visible_{unique_id}"
         if st.session_state.get(stats_toggle_key, False):
-            display_stats_enhanced(entry['stats'], entry['query_params'])
+            display_stats_enhanced(entry['stats'], {}) # No query params for simplified interface
         
         if not is_history:
             st.markdown("---")
@@ -419,9 +398,8 @@ def display_sources_enhanced(sources):
     for i, chunk in enumerate(sources, 1):
         metadata = chunk['metadata']
         file_name = metadata.get('file_name', f'Source {i}')
-        section = metadata.get('section', 'unknown section')
         
-        with st.expander(f"📄 {file_name} ({section})", expanded=False):
+        with st.expander(f"📄 {file_name}", expanded=False):
             # Content with better formatting
             st.markdown("**📝 Content:**")
             st.markdown(f"```\n{chunk['text']}\n```")
@@ -450,16 +428,9 @@ def display_stats_enhanced(stats, query_params):
     with perf_col3:
         st.metric("⏱️ Query Time", f"{stats['query_time_seconds']:.2f}s")
     
-    # Query parameters used
-    st.markdown("**⚙️ Query Parameters:**")
-    param_cols = st.columns(3)
-    
-    with param_cols[0]:
-        st.write(f"**Chunks Retrieved:** {query_params['top_k']}")
-    with param_cols[1]:
-        st.write(f"**Temperature:** {query_params['temperature']}")
-    with param_cols[2]:
-        st.write(f"**Max Tokens:** {query_params['max_tokens']}")
+    # Simplified settings info
+    st.markdown("**⚙️ Query Settings:**")
+    st.info("🔧 Using optimized settings: Unlimited chunks, maximum response length")
 
 
 def copy_to_clipboard_js(text):

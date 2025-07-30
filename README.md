@@ -21,6 +21,13 @@ A Retrieval-Augmented Generation (RAG) Q&A system implemented using ChromaDB, Ll
 - Transparency: Sources can be cited and verified
 - Personalization and Security: Custom documents can be stored locally without having to access third party services
 
+### Enhanced Features
+- **Unified LLM Mode**: Automatically handles both document-based and general queries
+- **Smart Context Usage**: Uses document context when available, general knowledge when not
+- **Seamless Experience**: No more "I don't have relevant information" responses
+- **Versatile Applications**: Perfect for both document Q&A and general assistance tasks
+- **Corporate File Support**: Handles CSV and Excel files commonly used in business environments
+
 ## Quick Setup
 
 ### 1. Environment Setup
@@ -68,7 +75,8 @@ streamlit run app.py
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   📄 Document   │    │  🔧 Document   │    │  ✂️ Text        │    │  🔗 OpenAI API │
 │   Upload        │───▶│  Processing    │───▶│  Chunking       │───▶│  Embedding      │
-│ (PDF/DOCX/TXT)  │    │ (Extract Text)  │    │ (500 chars +    │    │ Generation      │
+│ (PDF/DOCX/TXT/  │    │ (Extract Text)  │    │ (500 chars +    │    │ Generation      │
+│  CSV/Excel)     │    │                 │    │  Metadata)      │    │ (1536-dim)      │
 └─────────────────┘    └─────────────────┘    │  Metadata)      │    │ (1536-dim)      │
                                               └─────────────────┘    └─────────────────┘
                                                        │                        │

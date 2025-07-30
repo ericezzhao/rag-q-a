@@ -105,7 +105,17 @@ class ChromaVectorStore:
                 # Generate unique ID if not present
                 node_id = node.node_id if hasattr(node, 'node_id') and node.node_id else str(uuid.uuid4())
                 
-                texts.append(node.text)
+                # Validate and clean text content
+                text_content = node.text.strip() if node.text else ""
+                if not text_content:
+                    logger.warning(f"Skipping node {node_id} with empty text content")
+                    continue
+                
+                # Ensure text is valid for API (remove any problematic characters)
+                text_content = text_content.replace('\x00', '')  # Remove null bytes
+                text_content = text_content[:8000]  # Limit text length to avoid API limits
+                
+                texts.append(text_content)
                 ids.append(node_id)
                 
                 # Prepare metadata (ChromaDB requires string values)
@@ -116,9 +126,44 @@ class ChromaVectorStore:
                 
                 metadatas.append(metadata)
             
-            # Generate embeddings
+            # Check if we have any valid texts after filtering
+            if not texts:
+                logger.warning("No valid text content found in nodes")
+                return {'success': False, 'error': 'No valid text content to process'}
+            
+            logger.info(f"Processing {len(texts)} valid text chunks for embedding")
+            
+            # Generate embeddings in batches to avoid API limits
             logger.info("Generating embeddings...")
-            embeddings = self.embedding_model.get_text_embedding_batch(texts)
+            batch_size = 100  # OpenAI recommends smaller batches
+            all_embeddings = []
+            
+            for i in range(0, len(texts), batch_size):
+                batch_texts = texts[i:i + batch_size]
+                logger.info(f"Processing embedding batch {i//batch_size + 1}/{(len(texts) + batch_size - 1)//batch_size} ({len(batch_texts)} texts)")
+                
+                try:
+                    batch_embeddings = self.embedding_model.get_text_embedding_batch(batch_texts)
+                    all_embeddings.extend(batch_embeddings)
+                except Exception as batch_error:
+                    logger.error(f"Error in embedding batch {i//batch_size + 1}: {str(batch_error)}")
+                    # If batch fails, try individual embeddings
+                    logger.info("Falling back to individual embedding generation...")
+                    for j, text in enumerate(batch_texts):
+                        try:
+                            embedding = self.embedding_model.get_text_embedding(text)
+                            all_embeddings.append(embedding)
+                        except Exception as single_error:
+                            logger.error(f"Error embedding text {i + j}: {str(single_error)}")
+                            # Use zero vector as fallback
+                            embedding_dim = 1536  # OpenAI text-embedding-ada-002 dimension
+                            all_embeddings.append([0.0] * embedding_dim)
+            
+            if len(all_embeddings) != len(texts):
+                logger.error(f"Embedding count mismatch: {len(all_embeddings)} vs {len(texts)}")
+                return {'success': False, 'error': 'Embedding generation failed'}
+            
+            embeddings = all_embeddings
             
             # Add to ChromaDB collection
             logger.info("Adding documents to ChromaDB...")

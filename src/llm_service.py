@@ -74,16 +74,9 @@ class LLMService:
             metadata = chunk.get('metadata', {})
             
             file_name = metadata.get('file_name', f'Document_{i}')
-            section = metadata.get('section', 'content')
+            unique_sources.add(file_name)
             
-            if section and section != 'content':
-                source_citation = f"{file_name} ({section})"
-                unique_sources.add(f"{file_name} ({section})")
-            else:
-                source_citation = file_name
-                unique_sources.add(file_name)
-            
-            context_entry = f"[SOURCE: {source_citation}]\n{chunk_text}\n"
+            context_entry = f"[SOURCE: {file_name}]\n{chunk_text}\n"
             context_parts.append(context_entry)
         
         context_text = "\n---\n".join(context_parts)
@@ -102,7 +95,7 @@ QUESTION: {query}
 INSTRUCTIONS:
 - Answer the question using the information provided in the context above
 - Always cite the specific document name when referencing information
-- Use this format: "According to [document name]" or "According to [document name] ([section])" 
+- Use this format: "According to [document name]" 
 - Be thorough and extract relevant details from the context
 - If you find partial information, provide what you can and indicate what might be missing
 - Only say "I don't have enough information" if the context truly contains no relevant information
@@ -333,4 +326,160 @@ Provide scores as: Relevance: X, Context_Use: X, Accuracy: X, Clarity: X, Comple
             return {
                 'success': False,
                 'error': str(e)
+            } 
+
+    def create_unified_prompt(self, query: str, context_chunks: List[Dict[str, Any]] = None) -> str:
+        """
+        Create a unified prompt that handles both document-based and general queries
+        
+        Args:
+            query: User's question
+            context_chunks: Retrieved document chunks with metadata (optional)
+            
+        Returns:
+            Formatted prompt string
+        """
+        if context_chunks:
+            # Has relevant documents - use them as primary source with general knowledge fallback
+            context_parts = []
+            unique_sources = set()
+            
+            for i, chunk in enumerate(context_chunks, 1):
+                chunk_text = chunk.get('text', '')
+                metadata = chunk.get('metadata', {})
+                
+                file_name = metadata.get('file_name', f'Document_{i}')
+                unique_sources.add(file_name)
+                
+                context_entry = f"[SOURCE: {file_name}]\n{chunk_text}\n"
+                context_parts.append(context_entry)
+            
+            context_text = "\n---\n".join(context_parts)
+            source_list = ", ".join(sorted(unique_sources))
+            
+            prompt = f"""You are a helpful assistant that answers questions using available information.
+
+AVAILABLE SOURCES: {source_list}
+
+DOCUMENT INFORMATION:
+{context_text}
+
+QUESTION: {query}
+
+INSTRUCTIONS:
+- FIRST, determine if the document information is relevant to answering this specific question
+- If the documents contain relevant data/information that directly answers the question, use them and cite sources
+- If the documents are not relevant to the question (e.g., asking for email help but documents contain cost data), IGNORE the documents and use only your general knowledge
+- When using document information, always cite: "According to [document name]"
+- When the documents are not relevant, provide a helpful answer using only your general knowledge
+- For mathematical content, use clear formatting:
+  * Use **bold** for important terms
+  * Use `code blocks` for formulas and calculations
+  * Use bullet points for step-by-step solutions
+  * Format equations clearly with proper spacing
+  * **IMPORTANT**: Do NOT use LaTeX notation like [ \\text{...} ] or \\left\\lfloor
+  * Instead, use plain text: "Output Height = floor((Input Height - Kernel Height) / Stride) + 1"
+  * Use simple mathematical notation: +, -, *, /, =, (, )
+  * For floor function, write "floor()" or use integer division
+- Be direct and honest about whether you're using document information or general knowledge
+- Structure your response clearly with proper formatting for readability
+
+ANSWER:"""
+        else:
+            # No relevant documents - use general knowledge
+            prompt = f"""You are a helpful assistant. Answer this question or help with this task: {query}
+
+Please provide a thorough and helpful response using your general knowledge.
+
+For mathematical content, use clear formatting:
+- Use **bold** for important terms
+- Use `code blocks` for formulas and calculations  
+- Use bullet points for step-by-step solutions
+- **IMPORTANT**: Do NOT use LaTeX notation like [ \\text{...} ] or \\left\\lfloor
+- Instead, use plain text: "Output Height = floor((Input Height - Kernel Height) / Stride) + 1"
+- Use simple mathematical notation: +, -, *, /, =, (, )
+- For floor function, write "floor()" or use integer division"""
+        
+        return prompt
+
+    def assess_relevance(self, query: str, context_chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Simple relevance check - if chunks are retrieved, consider them potentially relevant
+        Let the main LLM response generation handle actual relevance through prompting
+        
+        Args:
+            query: User's question
+            context_chunks: Retrieved document chunks
+            
+        Returns:
+            Dictionary with relevance assessment
+        """
+        if not context_chunks:
+            return {'relevant': False, 'reason': 'No chunks retrieved'}
+        
+        # If chunks were retrieved, consider them potentially relevant
+        # The main response generation will handle actual relevance through better prompting
+        return {'relevant': True, 'reason': 'Chunks retrieved, letting main response generation determine relevance'}
+
+    def generate_unified_response(self, query: str, context_chunks: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Generate a unified response that works with or without document context
+        
+        Args:
+            query: User's question
+            context_chunks: Retrieved document chunks with metadata (optional)
+            
+        Returns:
+            Dictionary with response and metadata
+        """
+        try:
+            logger.info(f"Generating unified response for query: '{query[:50]}...'")
+            
+            # Assess relevance of retrieved chunks
+            relevance_assessment = self.assess_relevance(query, context_chunks)
+            chunks_to_use = context_chunks if relevance_assessment['relevant'] else None
+            
+            logger.info(f"Relevance assessment: {relevance_assessment['reason']}")
+            if chunks_to_use:
+                logger.info(f"Using {len(chunks_to_use)} relevant chunks")
+            else:
+                logger.info("Using general knowledge only")
+            
+            # Create unified prompt
+            prompt = self.create_unified_prompt(query, chunks_to_use)
+            
+            # Generate response using LLM
+            response = self.llm.complete(prompt)
+            
+            # Extract response text
+            response_text = response.text.strip()
+            
+            # Compile results
+            result = {
+                'success': True,
+                'query': query,
+                'response': response_text,
+                'context_used': {
+                    'num_chunks': len(chunks_to_use) if chunks_to_use else 0,
+                    'sources': self._extract_sources(chunks_to_use) if chunks_to_use else [],
+                    'has_document_context': bool(chunks_to_use),
+                    'relevance_assessment': relevance_assessment
+                },
+                'model_info': {
+                    'model': self.model_name,
+                    'temperature': self.temperature,
+                    'max_tokens': Config.MAX_RESPONSE_TOKENS
+                }
+            }
+            
+            logger.info(f"Unified response generated successfully ({len(response_text)} chars)")
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error generating unified response: {str(e)}"
+            logger.error(error_msg)
+            return {
+                'success': False,
+                'error': error_msg,
+                'query': query
             } 

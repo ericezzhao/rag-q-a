@@ -11,6 +11,7 @@ from llama_index.core import Document
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.readers.file import PDFReader, DocxReader
 from llama_index.core.schema import TextNode
+import pandas as pd
 
 try:
     from .config import Config
@@ -44,6 +45,8 @@ class DocumentProcessor:
         self.pdf_reader = PDFReader()
         self.docx_reader = DocxReader()
         
+        # CSV and Excel processing will use pandas directly
+        
         logger.info(f"DocumentProcessor initialized with chunk_size={self.chunk_size}, chunk_overlap={self.chunk_overlap}")
     
     def load_document(self, file_path: str, original_filename: Optional[str] = None) -> List[Document]:
@@ -76,9 +79,34 @@ class DocumentProcessor:
             elif file_extension == '.docx':
                 documents = self.docx_reader.load_data(file=file_path)
             elif file_extension == '.txt':
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
+                # Try different encodings to handle various text file formats
+                encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+                content = None
+                
+                for encoding in encodings:
+                    try:
+                        with open(file_path, 'r', encoding=encoding) as f:
+                            content = f.read()
+                        logger.info(f"Successfully read text file with {encoding} encoding")
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                
+                if content is None:
+                    # If all encodings fail, try reading as binary and decode with error handling
+                    try:
+                        with open(file_path, 'rb') as f:
+                            binary_content = f.read()
+                        content = binary_content.decode('utf-8', errors='replace')
+                        logger.warning(f"Used error handling for text file encoding")
+                    except Exception as e:
+                        raise ValueError(f"Unable to read text file with any encoding: {str(e)}")
+                
                 documents = [Document(text=content)]
+            elif file_extension == '.csv':
+                documents = self._process_csv_file(file_path)
+            elif file_extension in ['.xlsx', '.xls']:
+                documents = self._process_excel_file(file_path)
             else:
                 raise ValueError(f"Unsupported file type: {file_extension}")
             
@@ -101,35 +129,7 @@ class DocumentProcessor:
             logger.error(f"Error loading document {file_path}: {str(e)}")
             raise
     
-    def detect_section_type(self, text: str) -> str:
-        """
-        Detect the general content type/section of the text chunk
-        Uses simple heuristics
 
-        Can possibly removed in the future or specialized for specific RAG purposes
-        
-        Args:
-            text: Text content to analyze
-            
-        Returns:
-            Basic section type or 'content' for general content
-        """
-        text_lower = text.lower().strip()
-        
-        if len(text_lower) < 50:
-            return 'header'
-        elif any(marker in text_lower for marker in ['table of contents', 'contents', 'index']):
-            return 'table_of_contents'
-        elif any(marker in text_lower for marker in ['abstract', 'summary', 'overview', 'introduction']):
-            return 'introduction'
-        elif any(marker in text_lower for marker in ['conclusion', 'conclusions', 'summary', 'final']):
-            return 'conclusion'
-        elif any(marker in text_lower for marker in ['references', 'bibliography', 'citations']):
-            return 'references'
-        elif any(marker in text_lower for marker in ['appendix', 'appendices', 'attachment']):
-            return 'appendix'
-        else:
-            return 'content'
     
     def chunk_documents(self, documents: List[Document]) -> List[TextNode]:
         """
@@ -150,17 +150,14 @@ class DocumentProcessor:
                 # Use node parser to create chunks
                 nodes = self.node_parser.get_nodes_from_documents([document])
                 
-                # Add metadata to each node (doc_id, chunk_id, chunk_index, total_chunks, chunk_size, section)
+                # Add metadata to each node (doc_id, chunk_id, chunk_index, total_chunks, chunk_size)
                 for node_idx, node in enumerate(nodes):
-                    section_type = self.detect_section_type(node.text)
-                    
                     node.metadata.update({
                         'doc_id': f"doc_{doc_idx}",
                         'chunk_id': f"doc_{doc_idx}_chunk_{node_idx}",
                         'chunk_index': node_idx,
                         'total_chunks': len(nodes),
                         'chunk_size': len(node.text),
-                        'section': section_type,
                         **document.metadata
                     })
                 
@@ -218,7 +215,7 @@ class DocumentProcessor:
     
     def get_supported_extensions(self) -> List[str]:
         """Get list of supported file extensions"""
-        return ['.pdf', '.docx', '.txt']
+        return ['.pdf', '.docx', '.txt', '.csv', '.xlsx', '.xls']
     
     def validate_file(self, file_path: str) -> Dict[str, Any]:
         """
@@ -268,4 +265,195 @@ class DocumentProcessor:
             'absolute_path': str(file_path.absolute())
         }
         
-        return validation 
+        return validation
+    
+    def _process_csv_file(self, file_path: Path) -> List[Document]:
+        """
+        Process CSV file and convert to document format
+        
+        Args:
+            file_path: Path to CSV file
+            
+        Returns:
+            List of Document objects
+        """
+        try:
+            # Read CSV file with encoding handling
+            try:
+                df = pd.read_csv(file_path)
+            except UnicodeDecodeError:
+                # Try different encodings for CSV files
+                encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+                df = None
+                
+                for encoding in encodings:
+                    try:
+                        df = pd.read_csv(file_path, encoding=encoding)
+                        logger.info(f"Successfully read CSV file with {encoding} encoding")
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                
+                if df is None:
+                    raise ValueError("Unable to read CSV file with any encoding")
+            
+            # Convert DataFrame to text representation
+            text_content = self._dataframe_to_text(df, "CSV")
+            
+            # Create document
+            document = Document(text=text_content)
+            
+            # Add CSV-specific metadata
+            document.metadata.update({
+                'file_type': 'csv',
+                'rows': len(df),
+                'columns': len(df.columns),
+                'column_names': list(df.columns),
+                'data_types': df.dtypes.to_dict()
+            })
+            
+            logger.info(f"Successfully processed CSV file: {len(df)} rows, {len(df.columns)} columns")
+            return [document]
+            
+        except Exception as e:
+            error_msg = f"Error processing CSV file {file_path}: {str(e)}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+    
+    def _process_excel_file(self, file_path: Path) -> List[Document]:
+        """
+        Process Excel file and convert to document format
+        
+        Args:
+            file_path: Path to Excel file
+            
+        Returns:
+            List of Document objects
+        """
+        try:
+            # Read Excel file
+            excel_file = pd.ExcelFile(file_path)
+            sheet_names = excel_file.sheet_names
+            
+            if not sheet_names:
+                raise ValueError("Excel file contains no sheets")
+            
+            documents = []
+            
+            for sheet_name in sheet_names:
+                try:
+                    # Read each sheet
+                    df = pd.read_excel(file_path, sheet_name=sheet_name)
+                    
+                    # Skip empty sheets
+                    if df.empty:
+                        logger.info(f"Skipping empty sheet: {sheet_name}")
+                        continue
+                        
+                except Exception as sheet_error:
+                    logger.warning(f"Error reading sheet '{sheet_name}': {str(sheet_error)}")
+                    continue
+                
+                # Convert DataFrame to text representation
+                text_content = self._dataframe_to_text(df, f"Excel Sheet: {sheet_name}")
+                
+                # Create document for each sheet
+                document = Document(text=text_content)
+                
+                # Add Excel-specific metadata
+                document.metadata.update({
+                    'file_type': 'excel',
+                    'sheet_name': sheet_name,
+                    'rows': len(df),
+                    'columns': len(df.columns),
+                    'column_names': list(df.columns),
+                    'data_types': df.dtypes.to_dict(),
+                    'total_sheets': len(sheet_names)
+                })
+                
+                documents.append(document)
+            
+            if not documents:
+                raise ValueError("No valid data found in Excel file")
+            
+            logger.info(f"Successfully processed Excel file: {len(sheet_names)} sheets, {len(documents)} documents created")
+            return documents
+            
+        except Exception as e:
+            error_msg = f"Error processing Excel file {file_path}: {str(e)}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+    
+    def _dataframe_to_text(self, df: pd.DataFrame, source_type: str) -> str:
+        """
+        Convert pandas DataFrame to structured text representation
+        
+        Args:
+            df: Pandas DataFrame
+            source_type: Type of source (CSV, Excel Sheet, etc.)
+            
+        Returns:
+            Structured text representation
+        """
+        # Handle empty DataFrame
+        if df.empty:
+            return f"{source_type} contains no data."
+        
+        # Get basic info
+        rows, cols = df.shape
+        column_names = list(df.columns)
+        
+        # Start building text content
+        text_parts = [
+            f"{source_type} Data Summary:",
+            f"- Total Rows: {rows}",
+            f"- Total Columns: {cols}",
+            f"- Column Names: {', '.join(column_names)}",
+            "",
+            "Data Preview:"
+        ]
+        
+        # Add column headers
+        header_row = " | ".join(str(col) for col in column_names)
+        text_parts.append(header_row)
+        text_parts.append("-" * len(header_row))
+        
+        # Add data rows (limit to first 20 rows to avoid huge documents)
+        max_preview_rows = min(20, rows)
+        for i in range(max_preview_rows):
+            row_data = []
+            for col in column_names:
+                value = df.iloc[i][col]
+                # Handle NaN values and long strings
+                if pd.isna(value):
+                    row_data.append("N/A")
+                else:
+                    str_value = str(value)
+                    # Truncate long values
+                    if len(str_value) > 50:
+                        str_value = str_value[:47] + "..."
+                    row_data.append(str_value)
+            
+            row_text = " | ".join(row_data)
+            text_parts.append(row_text)
+        
+        # Add summary if there are more rows
+        if rows > max_preview_rows:
+            text_parts.append(f"... and {rows - max_preview_rows} more rows")
+        
+        # Add data types information
+        text_parts.append("")
+        text_parts.append("Column Data Types:")
+        for col, dtype in df.dtypes.items():
+            text_parts.append(f"- {col}: {dtype}")
+        
+        # Add basic statistics for numeric columns
+        numeric_cols = df.select_dtypes(include=['number']).columns
+        if len(numeric_cols) > 0:
+            text_parts.append("")
+            text_parts.append("Numeric Column Statistics:")
+            for col in numeric_cols:
+                stats = df[col].describe()
+                text_parts.append(f"- {col}: min={stats['min']:.2f}, max={stats['max']:.2f}, mean={stats['mean']:.2f}")
+        
+        return "\n".join(text_parts) 

@@ -159,7 +159,7 @@ class RAGPipeline:
     
     def query(self, question: str, top_k: Optional[int] = None, filters: Optional[Dict] = None) -> Dict[str, Any]:
         """
-        Execute end-to-end RAG query
+        Execute unified query that works with or without document context
         
         Args:
             question: User's question
@@ -167,15 +167,15 @@ class RAGPipeline:
             filters: Optional metadata filters for retrieval
             
         Returns:
-            Dictionary with complete RAG response
+            Dictionary with complete response
         """
         start_time = time.time()
         top_k = top_k or Config.MAX_RETRIEVED_CHUNKS
         
         try:
-            logger.info(f"Processing RAG query: '{question[:50]}...'")
+            logger.info(f"Processing unified query: '{question[:50]}...'")
             
-            # Step 1: Retrieve relevant chunks
+            # Step 1: Always try to retrieve relevant chunks
             logger.info("Retrieving relevant chunks...")
             retrieval_result = self.vector_store.query(
                 query_text=question,
@@ -192,33 +192,9 @@ class RAGPipeline:
             
             retrieved_chunks = retrieval_result['nodes']
             
-            if not retrieved_chunks:
-                return {
-                    'success': True,
-                    'query': question,
-                    'response': "I don't have any relevant information in my knowledge base to answer your question.",
-                    'retrieved_chunks': [],
-                    'sources': [],
-                    'query_time_seconds': time.time() - start_time
-                }
-            
-            # Step 2: Prepare RAG context
-            context_text = "\n\n".join([chunk['text'] for chunk in retrieved_chunks])
-            
-            rag_context = RAGContext(
-                query=question,
-                retrieved_chunks=retrieved_chunks,
-                context_text=context_text,
-                metadata={
-                    'retrieval_method': 'vector_similarity',
-                    'collection_size': retrieval_result['collection_size'],
-                    'filters_applied': filters or {}
-                }
-            )
-            
-            # Step 3: Generate response
-            logger.info("Generating LLM response...")
-            llm_result = self.llm_service.generate_response(rag_context)
+            # Step 2: Generate unified response (works with or without context)
+            logger.info("Generating unified response...")
+            llm_result = self.llm_service.generate_unified_response(question, retrieved_chunks)
             
             if not llm_result['success']:
                 return {
@@ -228,8 +204,14 @@ class RAGPipeline:
                     'retrieved_chunks': retrieved_chunks
                 }
             
-            # Step 4: Compile complete response
+            # Step 3: Compile complete response
             query_time = time.time() - start_time
+            
+            # Get the chunks that were actually used (after relevance assessment)
+            chunks_used = llm_result['context_used']['num_chunks']
+            sources_used = llm_result['context_used']['sources']
+            has_document_context = llm_result['context_used']['has_document_context']
+            relevance_assessment = llm_result['context_used'].get('relevance_assessment', {})
             
             result = {
                 'success': True,
@@ -238,14 +220,17 @@ class RAGPipeline:
                 'retrieved_chunks': [{
                     'text': chunk['text'],
                     'metadata': chunk['metadata']
-                } for chunk in retrieved_chunks],
-                'sources': self._extract_sources(retrieved_chunks),
+                } for chunk in retrieved_chunks] if retrieved_chunks else [],
+                'sources': sources_used,
                 'pipeline_stats': {
                     'chunks_retrieved': len(retrieved_chunks),
-                    'total_context_chars': len(context_text),
+                    'chunks_used': chunks_used,
+                    'total_context_chars': sum(len(chunk['text']) for chunk in retrieved_chunks) if retrieved_chunks else 0,
                     'collection_size': retrieval_result['collection_size'],
                     'query_time_seconds': round(query_time, 2),
-                    'model_used': llm_result['model_info']['model']
+                    'model_used': llm_result['model_info']['model'],
+                    'has_document_context': has_document_context,
+                    'relevance_assessment': relevance_assessment
                 },
                 'metadata': {
                     'filters_used': filters,
@@ -255,13 +240,13 @@ class RAGPipeline:
                 }
             }
             
-            logger.info(f"RAG query completed successfully in {query_time:.2f}s")
+            logger.info(f"Unified query completed successfully in {query_time:.2f}s")
             logger.info(f"Retrieved {len(retrieved_chunks)} chunks, generated {len(llm_result['response'])} char response")
             
             return result
             
         except Exception as e:
-            error_msg = f"Error during RAG query: {str(e)}"
+            error_msg = f"Error during unified query: {str(e)}"
             logger.error(error_msg)
             return {
                 'success': False,
