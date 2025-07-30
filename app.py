@@ -422,11 +422,6 @@ def display_stats_enhanced(stats, query_params):
         st.metric("📝 Context Length", f"{stats['total_context_chars']:,} chars")
     with perf_col3:
         st.metric("⏱️ Query Time", f"{stats['query_time_seconds']:.2f}s")
-    
-    # Simplified settings info
-    st.markdown("**⚙️ Query Settings:**")
-    st.info("🔧 Using optimized settings: Unlimited chunks, maximum response length")
-
 
 def copy_to_clipboard_js(text):
     """Generate JavaScript to copy text to clipboard"""
