@@ -309,7 +309,7 @@ class DocumentProcessor:
                 'rows': len(df),
                 'columns': len(df.columns),
                 'column_names': list(df.columns),
-                'data_types': df.dtypes.to_dict()
+                'data_types': {col: str(dtype) for col, dtype in df.dtypes.to_dict().items()}
             })
             
             logger.info(f"Successfully processed CSV file: {len(df)} rows, {len(df.columns)} columns")
@@ -367,7 +367,7 @@ class DocumentProcessor:
                     'rows': len(df),
                     'columns': len(df.columns),
                     'column_names': list(df.columns),
-                    'data_types': df.dtypes.to_dict(),
+                    'data_types': {col: str(dtype) for col, dtype in df.dtypes.to_dict().items()},
                     'total_sheets': len(sheet_names)
                 })
                 

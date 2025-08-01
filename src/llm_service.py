@@ -209,6 +209,9 @@ ANSWER:"""
     
     def _extract_sources(self, chunks: List[Dict[str, Any]]) -> List[str]:
         """Extract unique source information from chunks"""
+        if not chunks:
+            return []
+        
         sources = set()
         for chunk in chunks:
             metadata = chunk.get('metadata', {})
@@ -414,7 +417,7 @@ For mathematical content, use clear formatting:
         Returns:
             Dictionary with relevance assessment
         """
-        if not context_chunks:
+        if not context_chunks or len(context_chunks) == 0:
             return {'relevant': False, 'reason': 'No chunks retrieved'}
         
         # If chunks were retrieved, consider them potentially relevant
@@ -434,6 +437,10 @@ For mathematical content, use clear formatting:
         """
         try:
             logger.info(f"Generating unified response for query: '{query[:50]}...'")
+            
+            # Ensure context_chunks is a valid list
+            if context_chunks is None:
+                context_chunks = []
             
             # Assess relevance of retrieved chunks
             relevance_assessment = self.assess_relevance(query, context_chunks)

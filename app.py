@@ -20,13 +20,10 @@ from config import Config
 def initialize_rag_pipeline():
     """Initialize RAG pipeline with caching"""
     try:
-        # Use data directory for persistence
-        data_dir = Path("data")
-        data_dir.mkdir(exist_ok=True)
-        
+        # Use the same path and collection as the automation API
         pipeline = RAGPipeline(
-            vector_store_path=str(data_dir / "vector_store"),
-            collection_name="streamlit_rag_collection_fresh"
+            vector_store_path="./data/chroma_db",
+            collection_name="rag_documents"
         )
         return pipeline, None
     except Exception as e:
@@ -66,7 +63,6 @@ def display_system_status(pipeline):
         llm_status = status['llm_service']['status']
         if llm_status == 'healthy':
             st.sidebar.success(f"🤖 LLM: {llm_status}")
-            st.sidebar.write(f"🧠 Model: {status['llm_service']['model']}")
         else:
             st.sidebar.error(f"🤖 LLM: {llm_status}")
         

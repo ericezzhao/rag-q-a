@@ -13,3 +13,4 @@ openpyxl
 xlrd
 
 openpyxl
+fastapi
